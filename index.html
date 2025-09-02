@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>健康経営ヒアリングシート（オフライン対応）</title>
+
+  <!-- 外部CDN一切なしの自前スタイル -->
+  <style>
+    :root{--brand1:#667eea;--brand2:#764ba2;--bg:#f5f5f5;--ink:#222;--muted:#6b7280;--panel:#fafafa;--line:#e5e7eb}
+    *{box-sizing:border-box} html,body{height:100%}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg)}
+    .container{max-width:1000px;margin:0 auto;padding:20px;background:#fff;box-shadow:0 0 20px rgba(0,0,0,.06)}
+    .header{background:linear-gradient(135deg,var(--brand1),var(--brand2));color:#fff;border-radius:12px;padding:24px;text-align:center}
+    .muted{opacity:.85}
+    .progress{height:6px;background:#e5e7eb;border-radius:3px;margin:16px 0}
+    .progress>div{height:100%;background:linear-gradient(90deg,var(--brand1),var(--brand2));border-radius:3px;transition:width .3s}
+    .tabs{display:flex;flex-wrap:wrap;border-bottom:2px solid #eee;gap:6px;margin-bottom:12px}
+    .tab{padding:10px 14px;color:#666;cursor:pointer;border:0;background:transparent;border-bottom:3px solid transparent;border-radius:6px 6px 0 0}
+    .tab.active{color:var(--brand1);border-bottom-color:var(--brand1);background:#f8f9ff}
+    .panel{display:none;animation:fade .2s ease}
+    .panel.active{display:block}
+    @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+    .section{margin:24px 0;padding:18px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+    .section h2{color:var(--brand1);font-weight:700;border-bottom:2px solid var(--brand1);padding-bottom:8px;margin:0 0 16px}
+    label{font-weight:700;color:#333;display:block;margin:6px 0}
+    input,select,textarea{border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:auto;max-width:100%}
+    input:focus,select:focus,textarea:focus{outline:none;border-color:var(--brand1);box-shadow:0 0 0 2px rgba(102,126,234,.2)}
+    input[type="number"]{width:140px}
+    input[type="date"],input[type="time"]{width:170px}
+    .grid{display:grid;gap:12px}
+    @media(min-width:768px){.grid.cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    .row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .table-wrap{overflow-x:auto}
+    table{width:100%;border-collapse:collapse;background:#fff}
+    th,td{border:1px solid var(--line);padding:10px;text-align:center}
+    th{background:var(--brand1);color:#fff;font-weight:700}
+    .actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:20px}
+    .btn{padding:10px 16px;border:none;border-radius:10px;color:#fff;font-weight:700;cursor:pointer}
+    .btn-primary{background:linear-gradient(135deg,var(--brand1),var(--brand2))}
+    .btn-gray{background:#6b7280}
+    .btn-green{background:#22c55e}
+    .btn-amber{background:#f59e0b}
+    .nav{display:flex;justify-content:space-between;margin-top:12px}
+    .hint{font-size:12px;color:var(--muted)}
+    .toast{position:fixed;right:16px;bottom:16px;background:#111827;color:#fff;padding:10px 14px;border-radius:12px;opacity:0;transform:translateY(8px);transition:all .2s}
+    .toast.show{opacity:1;transform:translateY(0)}
+    .chart-box{max-width:620px;margin:0 auto;height:400px}
+    @media (max-width:768px){.tabs{overflow-x:auto}.container{padding:12px}}
+    /* 印刷 */
+    @media print{
+      body{-webkit-print-color-adjust:exact;print-color-adjust:exact;background:#fff}
+      .tabs,.actions,.nav{display:none!important}
+      .container{box-shadow:none;border:none;max-width:930px}
+      h1,h2{page-break-after:avoid}
+      .section{page-break-inside:avoid}
+    }
+  </style>
+
+  <!-- Chart.js: 取れない環境でも動き続けるよう後段で存在確認を実施 -->
+  <script>
+    (function loadChartJs(){
+      var s=document.createElement('script');
+      s.src="https://cdn.jsdelivr.net/npm/chart.js";
+      s.async=true;
+      s.onerror=function(){ console.warn('Chart.js を読み込めませんでした。チャートは非表示になります。'); };
+      document.head.appendChild(s);
+    })();
+  </script>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1 style="margin:0;font-size:24px;font-weight:800">健康経営ヒアリングシート</h1>
+      <p class="muted" style="margin:.25rem 0 0">保存・JSON入出力・レポート・印刷最適化（外部CDN不要）</p>
+      <p id="progressText" class="muted" style="margin:.25rem 0 0">1/7 ページ</p>
+    </div>
+
+    <div class="progress"><div id="bar" style="width:14%"></div></div>
+
+    <div class="tabs">
+      <button class="tab active" data-i="0">基本情報</button>
+      <button class="tab" data-i="1">経営指標</button>
+      <button class="tab" data-i="2">従業員構成</button>
+      <button class="tab" data-i="3">経営者の想い</button>
+      <button class="tab" data-i="4">健康課題</button>
+      <button class="tab" data-i="5">経営理念</button>
+      <button class="tab" data-i="6">実行・評価</button>
+    </div>
+
+    <!-- 0 基本情報 -->
+    <div class="panel active" id="p0">
+      <div class="section">
+        <h2>担当者情報</h2>
+        <div class="grid cols-2">
+          <div><label>記入日</label><input type="date" id="inputDate"></div>
+          <div><label>担当者役職</label><input type="text" id="position"></div>
+          <div><label>担当者氏名 <span style="color:#ef4444">*</span></label><input type="text" id="name" required></div>
+          <div><label>電話番号</label><input type="tel" id="phone"></div>
+          <div style="grid-column:1/-1"><label>メールアドレス</label><input type="email" id="email" style="width:100%"></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>会社概要</h2>
+        <div class="grid cols-2">
+          <div style="grid-column:1/-1"><label>会社名 <span style="color:#ef4444">*</span></label><input id="companyName" style="width:100%" required></div>
+          <div style="grid-column:1/-1"><label>代表者役職・氏名</label><input id="representative" style="width:100%"></div>
+          <div><label>所在地（郵便番号）</label><input id="postalCode" placeholder="000-0000"></div>
+          <div><label>所在地（住所）</label><input id="address" style="width:100%"></div>
+          <div><label>業種・取扱品</label><input id="industry"></div>
+          <div><label>資本金・出資金（万円）</label><input type="number" id="capital" min="0"></div>
+          <div><label>設立年</label><input type="number" id="establishedYear" min="1800" max="2100"></div>
+          <div><label>従業員数（正社員）</label><input type="number" id="regularEmployees" min="0"></div>
+          <div><label>従業員数（非正規）</label><input type="number" id="partTimeEmployees" min="0"></div>
+          <div style="grid-column:1/-1">
+            <label>健康保険</label>
+            <select id="healthInsurance" style="width:100%">
+              <option value="">選択してください</option>
+              <option value="協会けんぽ">協会けんぽ</option>
+              <option value="健康保険組合">健康保険組合</option>
+              <option value="その他">その他</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 1 経営指標 -->
+    <div class="panel" id="p1">
+      <div class="section">
+        <h2>経営指標（直近3年分）</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>指標</th><th>年 月期</th><th>年 月期</th><th>年 月期</th></tr></thead>
+            <tbody>
+              <tr><td>売上</td>
+                <td><input type="number" id="sales1"> 円</td>
+                <td><input type="number" id="sales2"> 円</td>
+                <td><input type="number" id="sales3"> 円</td></tr>
+              <tr><td>営業利益</td>
+                <td><input type="number" id="profit1"> 円</td>
+                <td><input type="number" id="profit2"> 円</td>
+                <td><input type="number" id="profit3"> 円</td></tr>
+              <tr><td>従業員数（社保加入者）</td>
+                <td><input type="number" id="employees1"> 名</td>
+                <td><input type="number" id="employees2"> 名</td>
+                <td><input type="number" id="employees3"> 名</td></tr>
+              <tr><td>入社人数・退職人数</td>
+                <td><input type="number" id="hired1" style="width:70px"> 名・ <input type="number" id="quit1" style="width:70px"> 名</td>
+                <td><input type="number" id="hired2" style="width:70px"> 名・ <input type="number" id="quit2" style="width:70px"> 名</td>
+                <td><input type="number" id="hired3" style="width:70px"> 名・ <input type="number" id="quit3" style="width:70px"> 名</td></tr>
+              <tr><td>1ヶ月以上の休職者数</td>
+                <td><input type="number" id="absent1"> 名</td>
+                <td><input type="number" id="absent2"> 名</td>
+                <td><input type="number" id="absent3"> 名</td></tr>
+              <tr><td>一人当たり付加価値額</td>
+                <td><input type="number" id="value1"> 円</td>
+                <td><input type="number" id="value2"> 円</td>
+                <td><input type="number" id="value3"> 円</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="hint">※一人当たり付加価値額：（営業利益＋人件費＋減価償却費）／従業員数</p>
+      </div>
+    </div>
+
+    <!-- 2 従業員構成 -->
+    <div class="panel" id="p2">
+      <div class="section">
+        <h2>従業員構成（男女・年齢別）</h2>
+        <div class="row" style="margin-bottom:8px"><label style="margin:0">平均年齢</label><input type="number" id="averageAge" min="0"> <span>歳</span></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th></th><th>20代以下</th><th>30代</th><th>40代</th><th>50代</th><th>60代</th><th>70代以上</th><th>合計</th></tr></thead>
+            <tbody>
+              <tr><td><strong>男</strong></td>
+                <td><input type="number" id="male20s" style="width:70px"> 名</td>
+                <td><input type="number" id="male30s" style="width:70px"> 名</td>
+                <td><input type="number" id="male40s" style="width:70px"> 名</td>
+                <td><input type="number" id="male50s" style="width:70px"> 名</td>
+                <td><input type="number" id="male60s" style="width:70px"> 名</td>
+                <td><input type="number" id="male70s" style="width:70px"> 名</td>
+                <td><span id="maleTotal">0</span> 名</td></tr>
+              <tr><td><strong>女</strong></td>
+                <td><input type="number" id="female20s" style="width:70px"> 名</td>
+                <td><input type="number" id="female30s" style="width:70px"> 名</td>
+                <td><input type="number" id="female40s" style="width:70px"> 名</td>
+                <td><input type="number" id="female50s" style="width:70px"> 名</td>
+                <td><input type="number" id="female60s" style="width:70px"> 名</td>
+                <td><input type="number" id="female70s" style="width:70px"> 名</td>
+                <td><span id="femaleTotal">0</span> 名</td></tr>
+              <tr><td><strong>合計</strong></td>
+                <td><span id="total20s">0</span> 名</td>
+                <td><span id="total30s">0</span> 名</td>
+                <td><span id="total40s">0</span> 名</td>
+                <td><span id="total50s">0</span> 名</td>
+                <td><span id="total60s">0</span> 名</td>
+                <td><span id="total70s">0</span> 名</td>
+                <td><span id="grandTotal">0</span> 名</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>従業員構成（上位3部門）</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>職種/部門</th><th>人数</th><th>勤務時間</th><th>休日</th><th>特徴（残業状況・構成等）</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>1</td>
+                <td><input id="dept1Name" style="width:180px"></td>
+                <td><input type="number" id="dept1Count" style="width:70px"> 名</td>
+                <td><input type="time" id="dept1Start"> 〜 <input type="time" id="dept1End"> (<input type="number" id="dept1Hours" style="width:60px"> h/日)</td>
+                <td>週休 <input type="number" id="dept1Holidays" style="width:50px"> 日</td>
+                <td><input id="dept1Features" style="width:240px"></td>
+              </tr>
+              <tr>
+                <td>2</td>
+                <td><input id="dept2Name" style="width:180px"></td>
+                <td><input type="number" id="dept2Count" style="width:70px"> 名</td>
+                <td><input type="time" id="dept2Start"> 〜 <input type="time" id="dept2End"> (<input type="number" id="dept2Hours" style="width:60px"> h/日)</td>
+                <td>週休 <input type="number" id="dept2Holidays" style="width:50px"> 日</td>
+                <td><input id="dept2Features" style="width:240px"></td>
+              </tr>
+              <tr>
+                <td>3</td>
+                <td><input id="dept3Name" style="width:180px"></td>
+                <td><input type="number" id="dept3Count" style="width:70px"> 名</td>
+                <td><input type="time" id="dept3Start"> 〜 <input type="time" id="dept3End"> (<input type="number" id="dept3Hours" style="width:60px"> h/日)</td>
+                <td>週休 <input type="number" id="dept3Holidays" style="width:50px"> 日</td>
+                <td><input id="dept3Features" style="width:240px"></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3 経営者の想い -->
+    <div class="panel" id="p3">
+      <div class="section">
+        <h2>経営者の想い・要望・悩み</h2>
+        <label>健康経営を始めるきっかけ</label>
+        <textarea id="managementThoughts" rows="4" placeholder="想いや背景" style="width:100%;resize:vertical"></textarea>
+        <label style="margin-top:8px">要望・悩み</label>
+        <textarea id="managementConcerns" rows="4" placeholder="現在の課題やニーズ" style="width:100%;resize:vertical"></textarea>
+      </div>
+    </div>
+
+    <!-- 4 健康課題＋レーダー -->
+    <div class="panel" id="p4">
+      <div class="section">
+        <h2>職場の健康課題（複数選択可）</h2>
+        <p class="hint">※カテゴリー別にレーダーチャートへ反映（Chart.js未取得時はメッセージ表示）</p>
+        <div class="grid cols-2">
+          <div>
+            <h3 style="color:var(--brand1);margin:8px 0">健康診断関連</h3>
+            <div>
+              <label><input type="checkbox" name="healthIssues" value="定期健診受診率の低さ" data-cat="健診"> 定期健診の受診率が低い</label>
+              <label><input type="checkbox" name="healthIssues" value="有所見者の多さ" data-cat="健診"> 有所見者が多い</label>
+              <label><input type="checkbox" name="healthIssues" value="再検査受診率の低さ" data-cat="健診"> 再検査・精密検査の受診率が低い</label>
+              <label><input type="checkbox" name="healthIssues" value="がん検診受診率の低さ" data-cat="健診"> がん検診の受診率が低い</label>
+              <label><input type="checkbox" name="healthIssues" value="生活習慣病患者の多さ" data-cat="健診"> 生活習慣病患者が多い</label>
+              <label><input type="checkbox" name="healthIssues" value="特定保健指導実施率の低さ" data-cat="健診"> 特定保健指導の実施率が低い</label>
+              <label><input type="checkbox" name="healthIssues" value="歯科健診受診率の低さ" data-cat="健診"> 歯科健診の受診率が低い</label>
+            </div>
+          </div>
+          <div>
+            <h3 style="color:var(--brand1);margin:8px 0">生活習慣</h3>
+            <div>
+              <label><input type="checkbox" name="healthIssues" value="運動不足" data-cat="生活"> 運動不足</label>
+              <label><input type="checkbox" name="healthIssues" value="喫煙者の多さ" data-cat="生活"> 喫煙者が多い</label>
+              <label><input type="checkbox" name="healthIssues" value="不規則な生活" data-cat="生活"> 不規則な生活（交代制）</label>
+              <label><input type="checkbox" name="healthIssues" value="食生活の乱れ" data-cat="生活"> 食生活の乱れ</label>
+              <label><input type="checkbox" name="healthIssues" value="飲酒量の多さ" data-cat="生活"> お酒の飲み過ぎ</label>
+              <label><input type="checkbox" name="healthIssues" value="睡眠不足" data-cat="生活"> 睡眠不足</label>
+            </div>
+          </div>
+          <div>
+            <h3 style="color:var(--brand1);margin:8px 0">メンタルヘルス</h3>
+            <div>
+              <label><input type="checkbox" name="healthIssues" value="活気のなさ・心の病" data-cat="メンタル"> 活気がない、心の病が多い</label>
+              <label><input type="checkbox" name="healthIssues" value="メンタル遅刻早退" data-cat="メンタル"> メンタル不調による遅刻・早退</label>
+              <label><input type="checkbox" name="healthIssues" value="メンタル欠勤" data-cat="メンタル"> メンタル不調による急な欠勤</label>
+              <label><input type="checkbox" name="healthIssues" value="メンタル長期休職" data-cat="メンタル"> メンタル不調による長期休職</label>
+              <label><input type="checkbox" name="healthIssues" value="メンタル退職" data-cat="メンタル"> メンタル不調による退職</label>
+            </div>
+          </div>
+          <div>
+            <h3 style="color:var(--brand1);margin:8px 0">その他</h3>
+            <div>
+              <label><input type="checkbox" name="healthIssues" value="高齢化" data-cat="その他"> 高齢化</label>
+              <label><input type="checkbox" name="healthIssues" value="腰痛・肩こり" data-cat="その他"> 腰痛・肩こり</label>
+              <label><input type="checkbox" name="healthIssues" value="花粉症" data-cat="その他"> 花粉症</label>
+              <label><input type="checkbox" name="healthIssues" value="感染症予防" data-cat="その他"> 感染症予防</label>
+              <label><input type="checkbox" name="healthIssues" value="女性の健康" data-cat="その他"> 女性の健康保持・増進</label>
+              <label><input type="checkbox" name="healthIssues" value="長時間労働" data-cat="その他"> 長時間労働</label>
+              <label><input type="checkbox" name="healthIssues" value="有休低い" data-cat="その他"> 有給休暇取得率が低い</label>
+              <label><input type="checkbox" name="healthIssues" value="治療と仕事の両立" data-cat="その他"> 病気の治療と仕事の両立支援</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>健康経営に取り組む理由（複数選択可）</h2>
+        <div id="reasons" class="grid cols-2">
+          <label><input type="checkbox" name="reasons" value="生産性向上"> 従業員の生産性の向上</label>
+          <label><input type="checkbox" name="reasons" value="業績向上"> 会社の業績の向上</label>
+          <label><input type="checkbox" name="reasons" value="コスト削減"> コスト削減</label>
+          <label><input type="checkbox" name="reasons" value="採用"> 優秀な従業員の採用</label>
+          <label><input type="checkbox" name="reasons" value="定着"> 従業員の定着化</label>
+          <label><input type="checkbox" name="reasons" value="ブランド"> 企業イメージ・ブランドの向上</label>
+          <label><input type="checkbox" name="reasons" value="コンプラ"> 法令遵守（コンプライアンス）</label>
+          <label><input type="checkbox" name="reasons" value="リスク低減"> 企業のリスク低減</label>
+          <label><input type="checkbox" name="reasons" value="労災防止"> 労災防止</label>
+          <label><input type="checkbox" name="reasons" value="健康優良企業"> 健康優良企業認定の取得</label>
+          <label><input type="checkbox" name="reasons" value="健経優良法人"> 健康経営優良法人認定の取得</label>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>健康課題サマリー</h2>
+        <p class="hint" id="chartHint">Chart.js 読み込み待機中…</p>
+        <div class="chart-box"><canvas id="issuesChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- 5 経営理念（抜粋） -->
+    <div class="panel" id="p5">
+      <div class="section">
+        <h2>健康経営チェックリスト - 経営理念・組織体制</h2>
+        <div>
+          <p><strong>1. 保険者の「健康宣言事業」に参加？</strong></p>
+          <div class="row">
+            <label><input type="radio" name="q1" value="○"> ○ 参加している</label>
+            <label><input type="radio" name="q1" value="△"> △ 検討中</label>
+            <label><input type="radio" name="q1" value="×"> × 参加していない</label>
+          </div>
+          <textarea name="q1_comment" placeholder="具体的内容" style="width:100%;margin-top:6px"></textarea>
+        </div>
+        <div style="margin-top:12px">
+          <p><strong>2. 健康宣言の社内外周知</strong></p>
+          <div class="row">
+            <label><input type="radio" name="q2" value="○"> ○ 社内外に周知</label>
+            <label><input type="radio" name="q2" value="△"> △ どちらかのみ</label>
+            <label><input type="radio" name="q2" value="×"> × 周知していない</label>
+          </div>
+          <textarea name="q2_comment" placeholder="具体的内容" style="width:100%;margin-top:6px"></textarea>
+        </div>
+        <div style="margin-top:12px">
+          <p><strong>3. 経営者の健診受診（過去1年以内）</strong></p>
+          <div class="row">
+            <label><input type="radio" name="q3" value="○"> ○ 受診</label>
+            <label><input type="radio" name="q3" value="△"> △ 予定あり</label>
+            <label><input type="radio" name="q3" value="×"> × 受診なし</label>
+          </div>
+          <div class="row" style="margin-top:6px"><label style="margin:0">受診日</label><input type="date" name="q3_date"></div>
+          <textarea name="q3_comment" placeholder="具体的内容" style="width:100%;margin-top:6px"></textarea>
+        </div>
+        <div style="margin-top:12px">
+          <p><strong>4. 健康づくり担当者の配置</strong></p>
+          <div class="row">
+            <label><input type="radio" name="q4" value="○"> ○ 各事業場</label>
+            <label><input type="radio" name="q4" value="△"> △ 一部のみ</label>
+            <label><input type="radio" name="q4" value="×"> × なし</label>
+          </div>
+          <textarea name="q4_comment" placeholder="具体的内容" style="width:100%;margin-top:6px"></textarea>
+        </div>
+        <div style="margin-top:12px">
+          <p><strong>5. 安全委員会/衛生委員会の設置</strong></p>
+          <div class="row">
+            <label><input type="radio" name="q5" value="○"> ○ 設置</label>
+            <label><input type="radio" name="q5" value="△"> △ 義務なし（50人未満）</label>
+            <label><input type="radio" name="q5" value="×"> × 未設置</label>
+          </div>
+          <textarea name="q5_comment" placeholder="具体的内容" style="width:100%;margin-top:6px"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6 実行・評価・法令遵守（抜粋） -->
+    <div class="panel" id="p6">
+      <div class="section">
+        <h2>実行・評価・法令遵守</h2>
+        <div style="margin-bottom:12px">
+          <p><strong>8. 健康診断受診率</strong></p>
+          <div class="row" style="margin-top:6px">
+            <input type="number" id="healthCheckTotal" style="width:100px"> 人中
+            <input type="number" id="healthCheckReceived" style="width:100px"> 人受診
+            （<span id="healthCheckPercentage">0</span>%）
+          </div>
+          <div class="row" style="margin-top:6px">
+            <label><input type="radio" name="q8" value="○"> ○ 100〜95%</label>
+            <label><input type="radio" name="q8" value="△"> △ 94〜70%</label>
+            <label><input type="radio" name="q8" value="×"> × 70%未満</label>
+          </div>
+        </div>
+        <div style="margin-bottom:12px">
+          <p><strong>10. ストレスチェックの実施</strong></p>
+          <div class="row" style="margin-top:6px">
+            <label><input type="radio" name="q10" value="○"> ○ 実施（50人以上義務）</label>
+            <label><input type="radio" name="q10" value="△"> △ 義務なし（50人未満）</label>
+            <label><input type="radio" name="q10" value="×"> × 未実施</label>
+          </div>
+          <textarea name="q10_comment" placeholder="具体的内容" style="width:100%;margin-top:6px"></textarea>
+        </div>
+        <div style="margin-bottom:12px">
+          <p><strong>24. 実施後の改善・効果検証</strong></p>
+          <div class="row" style="margin-top:6px">
+            <label><input type="radio" name="q24" value="○"> ○ 指標を定め検証</label>
+            <label><input type="radio" name="q24" value="△"> △ 指標はあるが未検証</label>
+            <label><input type="radio" name="q24" value="×"> × 指標も検証もなし</label>
+          </div>
+          <textarea name="q24_comment" placeholder="具体的内容" style="width:100%;margin-top:6px"></textarea>
+        </div>
+        <div style="margin-bottom:12px">
+          <p><strong>25. 就業規則の作成・変更・周知</strong></p>
+          <div class="row" style="margin-top:6px">
+            <label><input type="radio" name="q25" value="○"> ○ 実施</label>
+            <label><input type="radio" name="q25" value="△"> △ 旧版のみ</label>
+            <label><input type="radio" name="q25" value="×"> × 未作成</label>
+          </div>
+          <textarea name="q25_comment" placeholder="具体的内容" style="width:100%;margin-top:6px"></textarea>
+        </div>
+        <div style="margin-bottom:12px">
+          <p><strong>26. 三六協定の締結・届出</strong></p>
+          <div class="row" style="margin-top:6px">
+            <label><input type="radio" name="q26" value="○"> ○ 締結・届出済</label>
+            <label><input type="radio" name="q26" value="△"> △ 締結のみ</label>
+            <label><input type="radio" name="q26" value="×"> × なし</label>
+          </div>
+          <textarea name="q26_comment" placeholder="具体的内容" style="width:100%;margin-top:6px"></textarea>
+        </div>
+        <div>
+          <p><strong>27. 残業代の未払い</strong></p>
+          <div class="row" style="margin-top:6px">
+            <label><input type="radio" name="q27" value="○"> ○ ない</label>
+            <label><input type="radio" name="q27" value="△"> △ あるが支払予定</label>
+            <label><input type="radio" name="q27" value="×"> × ある/不明</label>
+          </div>
+          <textarea name="q27_comment" placeholder="具体的内容" style="width:100%;margin-top:6px"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-gray" id="btnSave">一時保存</button>
+      <button class="btn btn-primary" id="btnLoad">データ読み込み</button>
+      <button class="btn btn-amber" id="btnExport">JSON書き出し</button>
+      <label class="btn btn-amber" style="cursor:pointer">JSON読込
+        <input type="file" id="importFile" accept="application/json" style="display:none">
+      </label>
+      <button class="btn btn-green" id="btnReport">レポート生成</button>
+      <button class="btn btn-primary" onclick="window.print()">印刷</button>
+    </div>
+
+    <div class="nav">
+      <button class="btn btn-gray" id="prev">前へ</button>
+      <button class="btn btn-primary" id="next">次へ</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast">saved</div>
+
+  <script>
+    // ------- ユーティリティ
+    const TABS=7; let cur=0; const $=s=>document.querySelector(s); const $$=s=>document.querySelectorAll(s);
+    const showToast=(msg)=>{const t=$('#toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1300)};
+
+    // タブ制御
+    $$('.tab').forEach(btn=>btn.addEventListener('click',()=>switchTab(parseInt(btn.dataset.i))));
+    $('#prev').onclick=()=>switchTab(Math.max(0,cur-1));
+    $('#next').onclick=()=>switchTab(Math.min(TABS-1,cur+1));
+    function switchTab(i){
+      $$('.tab').forEach(b=>b.classList.remove('active'));
+      $$('.panel').forEach(p=>p.classList.remove('active'));
+      cur=i; $(`.tab[data-i="${i}"]`).classList.add('active'); $(`#p${i}`).classList.add('active');
+      $('#bar').style.width=((cur+1)/TABS*100)+'%'; $('#progressText').textContent=`${cur+1}/${TABS} ページ`;
+    }
+
+    // 既定日付
+    (function(){ const el=$('#inputDate'); if(el && !el.value){ el.value=new Date().toISOString().split('T')[0]; } })();
+
+    // 従業員集計
+    (function(){
+      const ages=['20s','30s','40s','50s','60s','70s'];
+      function recalc(){
+        let m=0,f=0;
+        ages.forEach(a=>{
+          const mv=parseInt((document.getElementById('male'+a)?.value)||0)||0;
+          const fv=parseInt((document.getElementById('female'+a)?.value)||0)||0;
+          m+=mv; f+=fv;
+          const tgt=document.getElementById('total'+a); if(tgt) tgt.textContent=mv+fv;
+        });
+        $('#maleTotal').textContent=m; $('#femaleTotal').textContent=f; $('#grandTotal').textContent=m+f;
+      }
+      ages.forEach(a=>['male','female'].forEach(g=>{
+        const el=document.getElementById(g+a); if(el) el.addEventListener('input',recalc);
+      }));
+      recalc();
+    })();
+
+    // 健診率算出 + 判定
+    (function(){
+      const total=$('#healthCheckTotal'), got=$('#healthCheckReceived'), span=$('#healthCheckPercentage');
+      function calc(){
+        const t=parseInt(total?.value||0)||0, g=parseInt(got?.value||0)||0;
+        const p=t>0? Math.round(g/t*100) : 0;
+        span.textContent=p;
+        const setQ8=v=>document.querySelectorAll('input[name="q8"]').forEach(x=>x.checked=(x.value===v));
+        if(p>=95) setQ8('○'); else if(p>=70) setQ8('△'); else setQ8('×');
+      }
+      total?.addEventListener('input',calc); got?.addEventListener('input',calc); calc();
+    })();
+
+    // レーダー：Chart.js が無い場合は回避
+    let radar=null; function updateRadar(){
+      const cats=['健診','生活','メンタル','その他']; const data=[0,0,0,0];
+      $$('input[name="healthIssues"]:checked').forEach(chk=>{ const i=cats.indexOf(chk.dataset.cat); if(i>=0) data[i]++; });
+      const ctx=$('#issuesChart'); if(!ctx) return;
+
+      if(typeof Chart==='undefined'){ // fallback
+        $('#chartHint').textContent='Chart.js が読み込めなかったため、チャートは表示できません。';
+        return;
+      }
+      $('#chartHint').textContent='';
+      if(radar){ radar.destroy(); }
+      radar=new Chart(ctx,{type:'radar',
+        data:{labels:cats,datasets:[{label:'健康課題の項目数',data,backgroundColor:'rgba(59,130,246,.2)',borderColor:'rgba(59,130,246,1)',pointBackgroundColor:'rgba(59,130,246,1)'}]},
+        options:{responsive:true,maintainAspectRatio:false,scales:{r:{suggestedMin:0,suggestedMax:Math.max(5,...data)}}}
+      });
+    }
+    $$('input[name="healthIssues"]').forEach(el=>el.addEventListener('change',updateRadar));
+    // Chart.js のロードをポーリングして初期描画
+    (function waitChart(){
+      if(typeof Chart!=='undefined'){ updateRadar(); return; }
+      setTimeout(waitChart,200);
+    })();
+
+    // 収集／適用
+    function collect(){
+      const obj={};
+      $$('input,select,textarea').forEach(el=>{
+        if(el.type==='checkbox'){
+          if(!obj[el.name]) obj[el.name]=[]; if(el.checked) obj[el.name].push(el.value||el.id||true);
+        } else if(el.type==='radio'){
+          if(el.checked) obj[el.name]=el.value;
+        } else {
+          const key=el.id||el.name; if(!key) return; obj[key]=el.value;
+        }
+      });
+      return obj;
+    }
+    function apply(data){
+      if(!data) return;
+      $$('input,select,textarea').forEach(el=>{
+        if(el.type==='checkbox'){
+          const arr=data[el.name]; el.checked=Array.isArray(arr)&&(arr.includes(el.value)||arr.includes(el.id));
+        } else if(el.type==='radio'){
+          el.checked=(data[el.name]===el.value);
+        } else {
+          const key=el.id||el.name; if(key in data){ el.value=data[key]; }
+        }
+      });
+      updateRadar();
+    }
+
+    // 保存・読込
+    const STORE_KEY='health_mgmt_form_offline_v1';
+    $('#btnSave').onclick=()=>{ localStorage.setItem(STORE_KEY,JSON.stringify(collect())); showToast('ローカルに保存しました'); };
+    $('#btnLoad').onclick=()=>{ const raw=localStorage.getItem(STORE_KEY); if(!raw){showToast('保存データなし');return;} apply(JSON.parse(raw)); showToast('保存データを読み込みました'); };
+
+    // JSON I/O
+    $('#btnExport').onclick=()=>{ const blob=new Blob([JSON.stringify(collect(),null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='health-hearing-data.json'; a.click(); URL.revokeObjectURL(a.href); };
+    $('#importFile').addEventListener('change',ev=>{ const f=ev.target.files?.[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const data=JSON.parse(r.result); apply(data); showToast('JSONを適用しました'); }catch{ showToast('JSON解析に失敗'); } }; r.readAsText(f,'utf-8'); });
+
+    // レポート生成（完全ローカルCSS・JS無し）
+    $('#btnReport').onclick=()=>{
+      const d=collect();
+      const errs=[]; if(!d.companyName) errs.push('会社名'); if(!d.name) errs.push('担当者氏名');
+      if(errs.length){ alert('必須未入力：'+errs.join('、')); switchTab(0); return; }
+
+      const issues=d.healthIssues||[]; const has=(k)=>issues.includes(k); const adv=[];
+      if(has('定期健診受診率の低さ')||has('有所見者の多さ')||has('再検査受診率の低さ')||has('がん検診受診率の低さ')||has('生活習慣病患者の多さ')||has('特定保健指導実施率の低さ')||has('歯科健診受診率の低さ')){
+        adv.push('<li><b>健診体制のテコ入れ</b>：未受診者フォロー、就業時間内健診、再検査の追跡管理</li>'); }
+      if(has('運動不足')||has('喫煙者の多さ')||has('不規則な生活')||has('食生活の乱れ')||has('飲酒量の多さ')||has('睡眠不足')){
+        adv.push('<li><b>生活習慣プログラム</b>：禁煙支援、運動促進（歩数/社内チャレンジ）、食習慣リテラシー</li>'); }
+      if(has('活気のなさ・心の病')||has('メンタル遅刻早退')||has('メンタル欠勤')||has('メンタル長期休職')||has('メンタル退職')){
+        adv.push('<li><b>メンタル対策</b>：ストレスチェック活用、面談導線、外部カウンセリング連携</li>'); }
+      if(has('長時間労働')||has('有休低い')){ adv.push('<li><b>働き方改革</b>：残業上限管理、有休計画付与、繁閑平準化</li>'); }
+      if(has('治療と仕事の両立')){ adv.push('<li><b>両立支援</b>：治療スケジュール配慮、主治医と会社の連絡様式整備</li>'); }
+
+      const lawGood = d.q25==='○' && d.q26==='○' && d.q27==='○';
+      let chartUrl=''; try{ if(typeof Chart!=='undefined' && radar){ chartUrl=radar.toBase64Image(); } }catch{}
+
+      const checkedList = (issues||[]).map(x=>`<li>✅ ${x}</li>`).join('');
+
+      const html=`<!DOCTYPE html><html lang="ja"><head>
+        <meta charset="utf-8"><title>健康経営サマリーレポート</title>
+        <style>
+          body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#fff;color:#111;margin:0;padding:24px}
+          h1,h2{margin:.2rem 0}
+          .box{background:#f3f4f6;padding:16px;border-radius:12px;margin:16px 0}
+          .muted{color:#6b7280}
+          @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+        </style>
+      </head><body>
+        <h1 style="font-size:22px;font-weight:800;margin-bottom:4px">${(d.companyName||'貴社')} 健康経営サマリーレポート</h1>
+        <p class="muted" style="margin-top:0">担当：${d.name||''} ／ 日付：${d.inputDate||''}</p>
+
+        <div class="box">
+          <h2 style="font-size:18px;font-weight:800">健康課題の可視化</h2>
+          ${
+            chartUrl
+              ? `<img src="${chartUrl}" alt="レーダーチャート" style="max-width:640px;width:100%;height:auto;border-radius:8px;display:block;margin-top:8px"/>`
+              : '<p class="muted">（チャート未作成またはオフラインで取得不可）</p>'
+          }
+          <ul style="margin-top:10px">${checkedList || '<li>課題チェックなし</li>'}</ul>
+        </div>
+
+        <div class="box">
+          <h2 style="font-size:18px;font-weight:800">推奨される主な取り組み</h2>
+          <ul>${adv.join('') || '<li>今回の選択からは特段の優先提案はありません。</li>'}</ul>
+        </div>
+
+        <div class="box">
+          <h2 style="font-size:18px;font-weight:800">法令遵守チェック</h2>
+          <ul>
+            <li><b>就業規則：</b> ${d.q25==='○' ? '✅ 作成・周知済' : '❗ 確認・整備を推奨'}</li>
+            <li><b>三六協定：</b> ${d.q26==='○' ? '✅ 締結・届出済' : '❗ 届出状況の確認が必要'}</li>
+            <li><b>残業代未払い：</b> ${d.q27==='○' ? '✅ 未払いなし' : '❗ 実態確認・是正を推奨'}</li>
+          </ul>
+          ${lawGood ? '<p style="color:#166534;margin-top:6px">法令遵守の基礎項目は概ね良好です。</p>' : '<p style="color:#991b1b;margin-top:6px">リスク低減のため早期の是正計画を推奨します。</p>'}
+        </div>
+      </body></html>`;
+
+      const w=window.open('','_blank');
+      w.document.open(); w.document.write(html); w.document.close(); w.focus();
+      setTimeout(()=>{ try{ w.print(); }catch{} },300);
+    };
+
+    // ショートカット
+    document.addEventListener('keydown',(e)=>{
+      if(!e.ctrlKey) return;
+      const k=e.key.toLowerCase();
+      if(k==='s'){ e.preventDefault(); $('#btnSave').click(); }
+      if(k==='p'){ e.preventDefault(); window.print(); }
+    });
+  </script>
+</body>
+</html>
